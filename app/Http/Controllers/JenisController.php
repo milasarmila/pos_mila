@@ -4,20 +4,22 @@ namespace App\Http\Controllers;
 
 use App\Models\Jenis;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 class JenisController extends Controller
 {
     /**
-     * Tampilkan halaman utama jenis produk (Daftar Data)
+     * Tampilkan daftar jenis
      */
     public function index()
     {
         $jenis = Jenis::all();
+
         return view('jenis.index', compact('jenis'));
     }
 
     /**
-     * Tampilkan form untuk menambah jenis baru
+     * Form tambah jenis
      */
     public function create()
     {
@@ -25,23 +27,38 @@ class JenisController extends Controller
     }
 
     /**
-     * Simpan data jenis baru ke database
+     * Simpan jenis baru
      */
     public function store(Request $request)
     {
         $request->validate([
             'nama_jenis' => 'required|string|max:255',
+            'foto' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
+        ], [
+            'nama_jenis.required' => 'Nama jenis wajib diisi.',
+            'foto.image' => 'File harus berupa gambar.',
+            'foto.mimes' => 'Foto harus berformat JPG, JPEG, PNG, atau WEBP.',
+            'foto.max' => 'Ukuran foto maksimal 2 MB.',
         ]);
 
-        Jenis::create([
-            'nama_jenis' => $request->nama_jenis
-        ]);
+        $data = [
+            'nama_jenis' => $request->nama_jenis,
+        ];
 
-        return redirect()->route('Jenis.index')->with('success', 'Jenis produk berhasil ditambahkan!');
+        // Jika user memilih foto
+        if ($request->hasFile('foto')) {
+            $data['foto'] = $request->file('foto')->store('jenis', 'public');
+        }
+
+        Jenis::create($data);
+
+        return redirect()
+            ->route('Jenis.index')
+            ->with('success', 'Jenis produk berhasil ditambahkan!');
     }
 
     /**
-     * Tampilkan data jenis tertentu (opsional)
+     * Tampilkan detail jenis
      */
     public function show(string $id)
     {
@@ -49,39 +66,71 @@ class JenisController extends Controller
     }
 
     /**
-     * Tampilkan form edit untuk jenis tertentu
+     * Form edit
      */
     public function edit(string $id)
     {
         $jenis = Jenis::findOrFail($id);
+
         return view('jenis.edit', compact('jenis'));
     }
 
     /**
-     * Perbarui data jenis di database
+     * Update jenis
      */
     public function update(Request $request, string $id)
     {
         $request->validate([
             'nama_jenis' => 'required|string|max:255',
+            'foto' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
+        ], [
+            'nama_jenis.required' => 'Nama jenis wajib diisi.',
+            'foto.image' => 'File harus berupa gambar.',
+            'foto.mimes' => 'Foto harus berformat JPG, JPEG, PNG, atau WEBP.',
+            'foto.max' => 'Ukuran foto maksimal 2 MB.',
         ]);
 
         $jenis = Jenis::findOrFail($id);
-        $jenis->update([
-            'nama_jenis' => $request->nama_jenis
-        ]);
 
-        return redirect()->route('Jenis.index')->with('success', 'Jenis produk berhasil diperbarui!');
+        $data = [
+            'nama_jenis' => $request->nama_jenis,
+        ];
+
+        // Kalau upload foto baru
+        if ($request->hasFile('foto')) {
+
+            // Hapus foto lama jika ada
+            if ($jenis->foto && Storage::disk('public')->exists($jenis->foto)) {
+                Storage::disk('public')->delete($jenis->foto);
+            }
+
+            // Simpan foto baru
+            $data['foto'] = $request->file('foto')->store('jenis', 'public');
+        }
+
+        $jenis->update($data);
+
+        return redirect()
+            ->route('Jenis.index')
+            ->with('success', 'Jenis produk berhasil diperbarui!');
     }
 
     /**
-     * Hapus data jenis dari database
+     * Hapus jenis
      */
     public function destroy(string $id)
     {
         $jenis = Jenis::findOrFail($id);
+
+        // Hapus foto dari storage
+        if ($jenis->foto && Storage::disk('public')->exists($jenis->foto)) {
+            Storage::disk('public')->delete($jenis->foto);
+        }
+
         $jenis->delete();
 
-        return redirect()->route('Jenis.index')->with('success', 'Jenis produk berhasil dihapus!');
+        return redirect()
+            ->route('Jenis.index')
+            ->with('success', 'Jenis produk berhasil dihapus!');
     }
 }

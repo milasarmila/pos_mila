@@ -7,6 +7,7 @@ use App\Http\Requests\User\StoreRequest;
 use App\Http\Requests\User\UpdateRequest;
 use App\Models\Role;
 use App\Models\User;
+use App\Models\Penjualan;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 
@@ -20,11 +21,16 @@ class UserController extends Controller
         $keyword = $request->input('search');
 
         if ($keyword) {
-            $users = User::whereRaw("MATCH(name, email) AGAINST(? IN BOOLEAN MODE)", [$keyword])
+            $users = User::whereRaw(
+                "MATCH(name, email) AGAINST(? IN BOOLEAN MODE)",
+                [$keyword]
+            )
                 ->paginate(10)
                 ->withQueryString();
         } else {
-            $users = User::query()->paginate(10)->withQueryString();
+            $users = User::query()
+                ->paginate(10)
+                ->withQueryString();
         }
 
         return view('users.index', compact('users'));
@@ -36,6 +42,7 @@ class UserController extends Controller
     public function create()
     {
         $roles = Role::all();
+
         return view('users.create', compact('roles'));
     }
 
@@ -52,7 +59,10 @@ class UserController extends Controller
         $data['role_id'] = $dataReq['role_id'];
 
         User::create($data);
-        return redirect()->route('admin.users')->with('success', 'User berhasil dibuat');
+
+        return redirect()
+            ->route('admin.users')
+            ->with('success', 'User berhasil dibuat');
     }
 
     /**
@@ -69,6 +79,7 @@ class UserController extends Controller
     public function edit(User $user)
     {
         $roles = Role::all();
+
         return view('users.edit', compact('user', 'roles'));
     }
 
@@ -89,8 +100,9 @@ class UserController extends Controller
 
         $user->save();
 
-        return redirect()->route('admin.users.edit', $user->id)->with('success', 'User updated');
-
+        return redirect()
+            ->route('admin.users.edit', $user->id)
+            ->with('success', 'User updated');
     }
 
     /**
@@ -98,8 +110,19 @@ class UserController extends Controller
      */
     public function destroy(User $user)
     {
+        // Lepaskan user dari transaksi penjualan
+        // agar riwayat transaksi tetap tersimpan.
+        Penjualan::where('user_id', $user->id)
+            ->update([
+                'user_id' => null
+            ]);
+
+        // Hapus user
         $user->delete();
 
-        return back()->with('success', 'User deleted');
+        return back()->with(
+            'success',
+            'User berhasil dihapus.'
+        );
     }
 }
